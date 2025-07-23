@@ -13,7 +13,6 @@ const registerButton = document.getElementById('register-button');
 const userInfo = document.getElementById('user-info');
 const usernameDisplay = document.getElementById('username-display');
 const logoutButton = document.getElementById('logout-button');
-const forceLoadButton = document.getElementById('force-load-button');
 
 // Leaderboard
 const leaderboardList = document.getElementById('leaderboard-list');
@@ -171,11 +170,5 @@ chatSend.addEventListener('click', () => {
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         chatSend.click();
-    }
-});
-
-forceLoadButton.addEventListener('click', () => {
-    if (confirm("This will overwrite the current state with the last save. Are you sure?")) {
-        ws.send(JSON.stringify({ type: 'forceLoad' }));
     }
 }); 

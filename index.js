@@ -27,12 +27,8 @@ async function loadState() {
             console.log(`Loading state from Redis, attempt ${attempt}...`);
             const rawData = await redis.get('aue-place-state');
 
-            // --- Enhanced Debug Logging ---
-            console.log(`[Debug] Attempt ${attempt}: Received raw data of type: ${typeof rawData}`);
-            console.log(`[Debug] Attempt ${attempt}: Raw data content:`, rawData);
-
-            if (typeof rawData === 'string' && rawData) {
-                const state = JSON.parse(rawData);
+            if (typeof rawData === 'object' && rawData !== null) {
+                const state = rawData;
                 canvas = state.canvas;
                 users = state.users;
                 leaderboard = state.leaderboard;
@@ -142,13 +138,13 @@ async function startServer() {
                     ws.send(JSON.stringify({ type: 'cooldown', payload: timeLeft }));
                     return;
                 }
-                
+
                 if (x >= 0 && x < 64 && y >= 0 && y < 64) {
                     canvas[y][x] = color;
                     user.lastPixelTime = now;
                     ipCooldowns.set(clientInfo.ip, now);
                     leaderboard[username] = (leaderboard[username] || 0) + 1;
-                    
+
                     ws.send(JSON.stringify({ type: 'cooldown', payload: 1000 * 60 }));
                     broadcast({ type: 'update', payload: { x, y, color } });
                     broadcastLeaderboard();
@@ -162,12 +158,6 @@ async function startServer() {
                     broadcast({ type: 'chatMessage', payload: chatMessage });
                     await saveState();
                 }
-            } else if (type === 'forceLoad') {
-                console.log(`Force load initiated by user: ${clientInfo.username}`);
-                await loadState();
-                broadcast({ type: 'canvas', payload: canvas });
-                broadcast({ type: 'chatHistory', payload: chatHistory });
-                broadcastLeaderboard();
             }
         });
 
