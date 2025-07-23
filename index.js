@@ -77,7 +77,7 @@ function addChatMessageToHistory(message) {
 }
 
 async function startServer() {
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
         console.log(`Server started on port ${PORT}.`);
     });
 
@@ -90,7 +90,11 @@ async function startServer() {
     await loadState();
 
     wss.on('connection', (ws, req) => {
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        // Normalize IPv4-mapped IPv6 addresses
+        if (ip.startsWith('::ffff:')) {
+            ip = ip.substring(7);
+        }
         clients.set(ws, { ip });
 
         ws.send(JSON.stringify({ type: 'canvas', payload: canvas }));
