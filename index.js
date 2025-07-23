@@ -11,11 +11,7 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
+let redis; // Declare redis here, but don't initialize
 let canvas, users, leaderboard, chatHistory;
 const clients = new Map();
 const ipCooldowns = new Map();
@@ -81,11 +77,14 @@ function addChatMessageToHistory(message) {
 
 async function startServer() {
     server.listen(PORT, () => {
-        console.log(`Server started on port ${PORT}. Waiting 5 seconds for environment to stabilize...`);
+        console.log(`Server started on port ${PORT}.`);
     });
 
-    // Wait 5 seconds to allow the environment to stabilize before making outbound calls.
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    // Initialize the Redis client here, once the server is running.
+    redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
 
     await loadState();
 
