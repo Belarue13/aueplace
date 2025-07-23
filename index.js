@@ -80,15 +80,15 @@ function addChatMessageToHistory(message) {
 }
 
 async function startServer() {
-    // 1. Start listening for connections immediately.
     server.listen(PORT, () => {
-        console.log(`Server started on port ${PORT}`);
+        console.log(`Server started on port ${PORT}. Waiting 5 seconds for environment to stabilize...`);
     });
 
-    // 2. Load the state from the database.
+    // Wait 5 seconds to allow the environment to stabilize before making outbound calls.
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
     await loadState();
 
-    // 3. Only now, after state is loaded, handle new WebSocket connections.
     wss.on('connection', (ws, req) => {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         clients.set(ws, { ip });
