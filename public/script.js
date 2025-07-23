@@ -16,8 +16,11 @@ const logoutButton = document.getElementById('logout-button');
 
 // Leaderboard
 const leaderboardList = document.getElementById('leaderboard-list');
+const cooldownContainer = document.getElementById('cooldown-container');
+const cooldownTimer = document.getElementById('cooldown-timer');
 
 let loggedInUser = null;
+let cooldownInterval = null;
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
@@ -79,6 +82,28 @@ function setLoggedOut() {
     userInfo.style.display = 'none';
 }
 
+function startCooldownTimer(ms) {
+    if (cooldownInterval) {
+        clearInterval(cooldownInterval);
+    }
+
+    cooldownContainer.style.display = 'block';
+    let timeLeft = Math.ceil(ms / 1000);
+
+    const updateTimer = () => {
+        if (timeLeft <= 0) {
+            cooldownContainer.style.display = 'none';
+            clearInterval(cooldownInterval);
+        } else {
+            cooldownTimer.textContent = `${timeLeft}s`;
+            timeLeft--;
+        }
+    };
+
+    updateTimer();
+    cooldownInterval = setInterval(updateTimer, 1000);
+}
+
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     switch (data.type) {
@@ -98,6 +123,9 @@ ws.onmessage = (event) => {
             break;
         case 'leaderboard':
             updateLeaderboard(data.payload);
+            break;
+        case 'cooldown':
+            startCooldownTimer(data.payload);
             break;
         case 'registered':
             alert(`Registered as ${data.payload.username}. You can now log in.`);

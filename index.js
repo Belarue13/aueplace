@@ -108,13 +108,13 @@ wss.on('connection', (ws, req) => {
             const user = users[username];
             const now = Date.now();
             const ipLastPixelTime = ipCooldowns.get(clientInfo.ip) || 0;
+            const userCooldownEnd = user.lastPixelTime + (1000 * 60);
+            const ipCooldownEnd = ipLastPixelTime + (1000 * 60);
 
-            if (now - user.lastPixelTime < 1000 * 60) {
-                ws.send(JSON.stringify({ type: 'error', payload: 'You can only place a pixel every minute.' }));
-                return;
-            }
-            if (now - ipLastPixelTime < 1000 * 60) {
-                ws.send(JSON.stringify({ type: 'error', payload: 'This device has already placed a pixel recently. Please wait.' }));
+            if (now < userCooldownEnd || now < ipCooldownEnd) {
+                const cooldownEnd = Math.max(userCooldownEnd, ipCooldownEnd);
+                const timeLeft = cooldownEnd - now;
+                ws.send(JSON.stringify({ type: 'cooldown', payload: timeLeft }));
                 return;
             }
             
@@ -124,6 +124,7 @@ wss.on('connection', (ws, req) => {
                 ipCooldowns.set(clientInfo.ip, now);
                 leaderboard[username] = (leaderboard[username] || 0) + 1;
                 
+                ws.send(JSON.stringify({ type: 'cooldown', payload: 1000 * 60 })); // Start 60s timer
                 broadcast({ type: 'update', payload: { x, y, color } });
                 broadcastLeaderboard();
                 saveState();
