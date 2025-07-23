@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -9,16 +10,40 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Initialize a 64x64 canvas with a default color (e.g., white)
-const canvasSize = 64;
-const canvas = Array(canvasSize).fill(0).map(() => Array(canvasSize).fill('#FFFFFF'));
-
+// --- State Variables ---
+let canvas, users, leaderboard, chatHistory;
 const clients = new Map();
-const users = {}; // In-memory user store
-const leaderboard = {}; // In-memory leaderboard
-const ipCooldowns = new Map(); // Tracks last pixel placement time per IP
-const chatHistory = []; // Stores last 10 chat messages
+const ipCooldowns = new Map();
+
+// --- State Management Functions ---
+function saveState() {
+    const state = {
+        canvas,
+        users,
+        leaderboard,
+        chatHistory
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
+}
+
+function loadState() {
+    if (fs.existsSync(DATA_FILE)) {
+        const rawData = fs.readFileSync(DATA_FILE);
+        const state = JSON.parse(rawData);
+        canvas = state.canvas;
+        users = state.users;
+        leaderboard = state.leaderboard;
+        chatHistory = state.chatHistory;
+    } else {
+        // Initialize default state if no file exists
+        canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
+        users = {};
+        leaderboard = {};
+        chatHistory = [];
+    }
+}
 
 function broadcast(message) {
     wss.clients.forEach((client) => {
@@ -43,10 +68,9 @@ function addChatMessageToHistory(message) {
 }
 
 wss.on('connection', (ws, req) => {
-    const ip = req.socket.remoteAddress;
-    clients.set(ws, { ip }); // Store IP with the connection
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    clients.set(ws, { ip });
 
-    // Send initial state
     ws.send(JSON.stringify({ type: 'canvas', payload: canvas }));
     ws.send(JSON.stringify({ type: 'chatHistory', payload: chatHistory }));
     broadcastLeaderboard();
@@ -63,6 +87,7 @@ wss.on('connection', (ws, req) => {
                 return;
             }
             users[username] = { password, lastPixelTime: 0 };
+            saveState();
             ws.send(JSON.stringify({ type: 'registered', payload: { username } }));
         } else if (type === 'login') {
             const { username, password } = payload;
@@ -84,16 +109,16 @@ wss.on('connection', (ws, req) => {
             const now = Date.now();
             const ipLastPixelTime = ipCooldowns.get(clientInfo.ip) || 0;
 
-            if (now - user.lastPixelTime < 1000 * 60) { // 1 minute user cooldown
+            if (now - user.lastPixelTime < 1000 * 60) {
                 ws.send(JSON.stringify({ type: 'error', payload: 'You can only place a pixel every minute.' }));
                 return;
             }
-            if (now - ipLastPixelTime < 1000 * 60) { // 1 minute IP cooldown
+            if (now - ipLastPixelTime < 1000 * 60) {
                 ws.send(JSON.stringify({ type: 'error', payload: 'This device has already placed a pixel recently. Please wait.' }));
                 return;
             }
             
-            if (x >= 0 && x < canvasSize && y >= 0 && y < canvasSize) {
+            if (x >= 0 && x < 64 && y >= 0 && y < 64) {
                 canvas[y][x] = color;
                 user.lastPixelTime = now;
                 ipCooldowns.set(clientInfo.ip, now);
@@ -101,6 +126,7 @@ wss.on('connection', (ws, req) => {
                 
                 broadcast({ type: 'update', payload: { x, y, color } });
                 broadcastLeaderboard();
+                saveState();
             }
         } else if (type === 'chatMessage') {
             const username = clientInfo.username;
@@ -108,6 +134,7 @@ wss.on('connection', (ws, req) => {
                 const chatMessage = { username, message: payload };
                 addChatMessageToHistory(chatMessage);
                 broadcast({ type: 'chatMessage', payload: chatMessage });
+                saveState();
             }
         }
     });
@@ -117,6 +144,8 @@ wss.on('connection', (ws, req) => {
     });
 });
 
+// Load initial state and start the server
+loadState();
 server.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 }); 
