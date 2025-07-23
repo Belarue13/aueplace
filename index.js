@@ -123,6 +123,7 @@ async function startServer() {
                         // For now, we'll allow it but you could add stricter rules.
                     }
                     clientInfo.username = username;
+                    clientInfo.visitorId = visitorId;
                     ws.send(JSON.stringify({ type: 'loggedIn', payload: { username } }));
                 } else {
                     ws.send(JSON.stringify({ type: 'error', payload: 'Invalid username or password.' }));
@@ -138,7 +139,7 @@ async function startServer() {
                 const user = users[username];
                 const now = Date.now();
                 const ipLastPixelTime = ipCooldowns.get(clientInfo.ip) || 0;
-                const fingerprintLastPixelTime = fingerprintCooldowns.get(user.visitorId) || 0;
+                const fingerprintLastPixelTime = fingerprintCooldowns.get(clientInfo.visitorId) || 0;
                 const userCooldownEnd = user.lastPixelTime + (1000 * 60);
                 const ipCooldownEnd = ipLastPixelTime + (1000 * 60);
                 const fingerprintCooldownEnd = fingerprintLastPixelTime + (1000 * 60);
@@ -154,7 +155,7 @@ async function startServer() {
                     canvas[y][x] = color;
                     user.lastPixelTime = now;
                     ipCooldowns.set(clientInfo.ip, now);
-                    fingerprintCooldowns.set(user.visitorId, now);
+                    fingerprintCooldowns.set(clientInfo.visitorId, now);
                     leaderboard[username] = (leaderboard[username] || 0) + 1;
 
                     ws.send(JSON.stringify({ type: 'cooldown', payload: 1000 * 60 }));
