@@ -26,29 +26,35 @@ async function saveState() {
 }
 
 async function loadState() {
-    try {
-        const rawData = await redis.get('aue-place-state');
-        if (typeof rawData === 'string' && rawData) {
-            const state = JSON.parse(rawData);
-            canvas = state.canvas;
-            users = state.users;
-            leaderboard = state.leaderboard;
-            chatHistory = state.chatHistory;
-            console.log("Successfully loaded state from Redis.");
-        } else {
-            console.log("No valid state in Redis, initializing fresh state.");
-            canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
-            users = {};
-            leaderboard = {};
-            chatHistory = [];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            console.log(`Loading state from Redis, attempt ${attempt}...`);
+            const rawData = await redis.get('aue-place-state');
+
+            if (typeof rawData === 'string' && rawData) {
+                const state = JSON.parse(rawData);
+                canvas = state.canvas;
+                users = state.users;
+                leaderboard = state.leaderboard;
+                chatHistory = state.chatHistory;
+                console.log("Successfully loaded state from Redis.");
+                return; // Exit the function successfully
+            }
+
+            console.log(`Attempt ${attempt}: No valid state found in Redis. Retrying in 1 second...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
+
+        } catch (error) {
+            console.error(`Attempt ${attempt}: An error occurred while loading state. Retrying...`, error);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
         }
-    } catch (error) {
-        console.error("Failed to load or parse state from Redis. Starting with a fresh state.", error);
-        canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
-        users = {};
-        leaderboard = {};
-        chatHistory = [];
     }
+
+    console.log("All attempts to load state failed. Initializing fresh state.");
+    canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
+    users = {};
+    leaderboard = {};
+    chatHistory = [];
 }
 
 function broadcast(message) {
