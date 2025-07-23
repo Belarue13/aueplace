@@ -83,7 +83,7 @@ wss.on('connection', (ws, req) => {
     ws.send(JSON.stringify({ type: 'chatHistory', payload: chatHistory }));
     broadcastLeaderboard();
 
-    ws.on('message', (message) => {
+    ws.on('message', async (message) => {
         const data = JSON.parse(message);
         const { type, payload } = data;
         const clientInfo = clients.get(ws);
@@ -95,7 +95,7 @@ wss.on('connection', (ws, req) => {
                 return;
             }
             users[username] = { password, lastPixelTime: 0 };
-            saveState();
+            await saveState();
             ws.send(JSON.stringify({ type: 'registered', payload: { username } }));
         } else if (type === 'login') {
             const { username, password } = payload;
@@ -135,7 +135,7 @@ wss.on('connection', (ws, req) => {
                 ws.send(JSON.stringify({ type: 'cooldown', payload: 1000 * 60 })); // Start 60s timer
                 broadcast({ type: 'update', payload: { x, y, color } });
                 broadcastLeaderboard();
-                saveState();
+                await saveState();
             }
         } else if (type === 'chatMessage') {
             const username = clientInfo.username;
@@ -143,7 +143,7 @@ wss.on('connection', (ws, req) => {
                 const chatMessage = { username, message: payload };
                 addChatMessageToHistory(chatMessage);
                 broadcast({ type: 'chatMessage', payload: chatMessage });
-                saveState();
+                await saveState();
             }
         }
     });
