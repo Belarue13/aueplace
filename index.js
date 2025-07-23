@@ -27,6 +27,10 @@ async function loadState() {
             console.log(`Loading state from Redis, attempt ${attempt}...`);
             const rawData = await redis.get('aue-place-state');
 
+            // --- Enhanced Debug Logging ---
+            console.log(`[Debug] Attempt ${attempt}: Received raw data of type: ${typeof rawData}`);
+            console.log(`[Debug] Attempt ${attempt}: Raw data content:`, rawData);
+
             if (typeof rawData === 'string' && rawData) {
                 const state = JSON.parse(rawData);
                 canvas = state.canvas;
