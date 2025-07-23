@@ -158,6 +158,12 @@ async function startServer() {
                     broadcast({ type: 'chatMessage', payload: chatMessage });
                     await saveState();
                 }
+            } else if (type === 'forceLoad') {
+                console.log(`Force load initiated by user: ${clientInfo.username}`);
+                await loadState();
+                broadcast({ type: 'canvas', payload: canvas });
+                broadcast({ type: 'chatHistory', payload: chatHistory });
+                broadcastLeaderboard();
             }
         });
 
