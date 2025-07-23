@@ -22,6 +22,7 @@ const cooldownTimer = document.getElementById('cooldown-timer');
 let loggedInUser = null;
 let cooldownInterval = null;
 let visitorId = null;
+let clientIPv4 = null; // This will store the client's reliable IPv4 address
 
 // Initialize FingerprintJS and get the visitor ID
 FingerprintJS.load()
@@ -29,6 +30,30 @@ FingerprintJS.load()
     .then(result => {
         visitorId = result.visitorId;
     });
+
+// Function to get client's public IPv4 address using WebRTC
+function getClientIP(onNewIP) {
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    pc.createDataChannel('');
+    pc.onicecandidate = (ice) => {
+        if (ice && ice.candidate && ice.candidate.candidate) {
+            const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
+            const ipAddr = ipRegex.exec(ice.candidate.candidate)?.[1];
+            if (ipAddr && !ipAddr.startsWith('192.168') && !ipAddr.startsWith('10.') && !ipAddr.startsWith('172.')) {
+                if (clientIPv4 !== ipAddr) {
+                    onNewIP(ipAddr);
+                }
+            }
+        }
+    };
+    pc.createOffer().then(offer => pc.setLocalDescription(offer));
+}
+
+// Get the client IP when the page loads
+getClientIP(ip => {
+    console.log('Detected client IPv4 for anti-cheat:', ip);
+    clientIPv4 = ip;
+});
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
@@ -43,10 +68,14 @@ function drawCanvas(canvas) {
             pixel.dataset.x = x;
             pixel.dataset.y = y;
             pixel.addEventListener('click', () => {
+                if (!clientIPv4) {
+                    alert('Your network address is still being determined for anti-cheat purposes. Please wait a moment and try again.');
+                    return;
+                }
                 const selectedColor = colorInput.value;
                 ws.send(JSON.stringify({
                     type: 'placePixel',
-                    payload: { x, y, color: selectedColor }
+                    payload: { x, y, color: selectedColor, clientIP: clientIPv4 }
                 }));
             });
             canvasContainer.appendChild(pixel);

@@ -139,10 +139,14 @@ async function startServer() {
                     return;
                 }
 
-                const { x, y, color } = payload;
+                const { x, y, color, clientIP } = payload; // Extract clientIP from the payload
                 const user = users[username];
                 const now = Date.now();
-                const ipLastPixelTime = ipCooldowns.get(clientInfo.ip) || 0;
+                // Use the client-reported IP for the cooldown check. Fallback to connection IP if not provided.
+                const ipForCooldown = clientIP || clientInfo.ip;
+                console.log(`Using IP for cooldown: ${ipForCooldown}`);
+
+                const ipLastPixelTime = ipCooldowns.get(ipForCooldown) || 0;
                 const fingerprintLastPixelTime = fingerprintCooldowns.get(clientInfo.visitorId) || 0;
                 const userCooldownEnd = user.lastPixelTime + (1000 * 60);
                 const ipCooldownEnd = ipLastPixelTime + (1000 * 60);
@@ -158,7 +162,7 @@ async function startServer() {
                 if (x >= 0 && x < 64 && y >= 0 && y < 64) {
                     canvas[y][x] = color;
                     user.lastPixelTime = now;
-                    ipCooldowns.set(clientInfo.ip, now);
+                    ipCooldowns.set(ipForCooldown, now); // Use the same IP for setting the cooldown
                     fingerprintCooldowns.set(clientInfo.visitorId, now);
                     leaderboard[username] = (leaderboard[username] || 0) + 1;
 
