@@ -21,6 +21,14 @@ const cooldownTimer = document.getElementById('cooldown-timer');
 
 let loggedInUser = null;
 let cooldownInterval = null;
+let visitorId = null;
+
+// Initialize FingerprintJS and get the visitor ID
+FingerprintJS.load()
+    .then(fp => fp.get())
+    .then(result => {
+        visitorId = result.visitorId;
+    });
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
@@ -143,7 +151,11 @@ registerButton.addEventListener('click', () => {
     const username = document.getElementById('register-username').value;
     const password = document.getElementById('register-password').value;
     if (username && password) {
-        ws.send(JSON.stringify({ type: 'register', payload: { username, password } }));
+        if (!visitorId) {
+            alert('Still generating a unique browser ID, please wait a moment and try again.');
+            return;
+        }
+        ws.send(JSON.stringify({ type: 'register', payload: { username, password, visitorId } }));
     }
 });
 
@@ -151,7 +163,11 @@ loginButton.addEventListener('click', () => {
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
     if (username && password) {
-        ws.send(JSON.stringify({ type: 'login', payload: { username, password } }));
+        if (!visitorId) {
+            alert('Still generating a unique browser ID, please wait a moment and try again.');
+            return;
+        }
+        ws.send(JSON.stringify({ type: 'login', payload: { username, password, visitorId } }));
     }
 });
 

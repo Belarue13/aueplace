@@ -15,6 +15,7 @@ let redis; // Declare redis here, but don't initialize
 let canvas, users, leaderboard, chatHistory;
 const clients = new Map();
 const ipCooldowns = new Map();
+const fingerprintCooldowns = new Map();
 
 async function saveState() {
     const state = { canvas, users, leaderboard, chatHistory };
@@ -102,17 +103,25 @@ async function startServer() {
             const clientInfo = clients.get(ws);
 
             if (type === 'register') {
-                const { username, password } = payload;
+                const { username, password, visitorId } = payload;
+                if (Object.values(users).some(u => u.visitorId === visitorId)) {
+                    ws.send(JSON.stringify({ type: 'error', payload: 'This browser is already associated with an account.' }));
+                    return;
+                }
                 if (users[username]) {
                     ws.send(JSON.stringify({ type: 'error', payload: 'Username already exists.' }));
                     return;
                 }
-                users[username] = { password, lastPixelTime: 0 };
+                users[username] = { password, visitorId, lastPixelTime: 0 };
                 await saveState();
                 ws.send(JSON.stringify({ type: 'registered', payload: { username } }));
             } else if (type === 'login') {
-                const { username, password } = payload;
+                const { username, password, visitorId } = payload;
                 if (users[username] && users[username].password === password) {
+                    if (users[username].visitorId !== visitorId) {
+                        // Optional: Handle login from a different browser.
+                        // For now, we'll allow it but you could add stricter rules.
+                    }
                     clientInfo.username = username;
                     ws.send(JSON.stringify({ type: 'loggedIn', payload: { username } }));
                 } else {
@@ -129,11 +138,13 @@ async function startServer() {
                 const user = users[username];
                 const now = Date.now();
                 const ipLastPixelTime = ipCooldowns.get(clientInfo.ip) || 0;
+                const fingerprintLastPixelTime = fingerprintCooldowns.get(user.visitorId) || 0;
                 const userCooldownEnd = user.lastPixelTime + (1000 * 60);
                 const ipCooldownEnd = ipLastPixelTime + (1000 * 60);
+                const fingerprintCooldownEnd = fingerprintLastPixelTime + (1000 * 60);
 
-                if (now < userCooldownEnd || now < ipCooldownEnd) {
-                    const cooldownEnd = Math.max(userCooldownEnd, ipCooldownEnd);
+                if (now < userCooldownEnd || now < ipCooldownEnd || now < fingerprintCooldownEnd) {
+                    const cooldownEnd = Math.max(userCooldownEnd, ipCooldownEnd, fingerprintCooldownEnd);
                     const timeLeft = cooldownEnd - now;
                     ws.send(JSON.stringify({ type: 'cooldown', payload: timeLeft }));
                     return;
@@ -143,6 +154,7 @@ async function startServer() {
                     canvas[y][x] = color;
                     user.lastPixelTime = now;
                     ipCooldowns.set(clientInfo.ip, now);
+                    fingerprintCooldowns.set(user.visitorId, now);
                     leaderboard[username] = (leaderboard[username] || 0) + 1;
 
                     ws.send(JSON.stringify({ type: 'cooldown', payload: 1000 * 60 }));
