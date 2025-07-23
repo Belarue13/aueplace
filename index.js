@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const fs = require('fs');
+const { Redis } = require('@upstash/redis');
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -10,7 +10,15 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
+// Use the Render Disk mount path if available, otherwise use the local directory
+const DATA_DIR = process.env.RENDER_DISK_MOUNT_PATH || __dirname;
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
+
+// --- Upstash Redis Client ---
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 // --- State Variables ---
 let canvas, users, leaderboard, chatHistory;
@@ -18,19 +26,19 @@ const clients = new Map();
 const ipCooldowns = new Map();
 
 // --- State Management Functions ---
-function saveState() {
+async function saveState() {
     const state = {
         canvas,
         users,
         leaderboard,
         chatHistory
     };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
+    await redis.set('aue-place-state', JSON.stringify(state));
 }
 
-function loadState() {
-    if (fs.existsSync(DATA_FILE)) {
-        const rawData = fs.readFileSync(DATA_FILE);
+async function loadState() {
+    const rawData = await redis.get('aue-place-state');
+    if (rawData) {
         const state = JSON.parse(rawData);
         canvas = state.canvas;
         users = state.users;
@@ -146,7 +154,11 @@ wss.on('connection', (ws, req) => {
 });
 
 // Load initial state and start the server
-loadState();
-server.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-}); 
+async function startServer() {
+    await loadState();
+    server.listen(PORT, () => {
+        console.log(`Server started on port ${PORT}`);
+    });
+}
+
+startServer(); 
