@@ -37,15 +37,25 @@ async function saveState() {
 }
 
 async function loadState() {
-    const rawData = await redis.get('aue-place-state');
-    if (rawData) {
-        const state = JSON.parse(rawData);
-        canvas = state.canvas;
-        users = state.users;
-        leaderboard = state.leaderboard;
-        chatHistory = state.chatHistory;
-    } else {
-        // Initialize default state if no file exists
+    try {
+        const rawData = await redis.get('aue-place-state');
+
+        if (typeof rawData === 'string' && rawData) {
+            const state = JSON.parse(rawData);
+            canvas = state.canvas;
+            users = state.users;
+            leaderboard = state.leaderboard;
+            chatHistory = state.chatHistory;
+            console.log("Successfully loaded state from Redis.");
+        } else {
+            console.log("No valid state in Redis, initializing fresh state.");
+            canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
+            users = {};
+            leaderboard = {};
+            chatHistory = [];
+        }
+    } catch (error) {
+        console.error("Failed to load or parse state from Redis. Starting with a fresh state.", error);
         canvas = Array(64).fill(0).map(() => Array(64).fill('#FFFFFF'));
         users = {};
         leaderboard = {};
